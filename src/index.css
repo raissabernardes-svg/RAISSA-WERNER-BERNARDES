@@ -1,0 +1,48 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-serif: "Playfair Display", Georgia, serif;
+  
+  /* Custom Natural Tones Palette */
+  --color-natural-cream: #FAF6F0;      /* Warm off-white / Linen canvas background */
+  --color-natural-card: #FAF8F5;       /* Warm secondary bg */
+  --color-natural-border: #E8E2D9;     /* Light natural stone boundary */
+  --color-natural-wood: #2D2622;       /* Deep warm dark / Text primary */
+  --color-natural-stone: #6B625C;      /* Warm charcoal / Text secondary */
+  --color-natural-sand: #A39990;       /* Muted tertiary */
+  
+  /* Sage (Active Green Accent) */
+  --color-natural-sage-50: #F3F5F3;
+  --color-natural-sage-100: #E3E8E3;
+  --color-natural-sage-200: #CAD4CA;
+  --color-natural-sage-600: #4D5D53;   /* Moss / Sage flagship green */
+  --color-natural-sage-700: #3E4D43;
+  --color-natural-sage-800: #303B33;
+  --color-natural-sage-950: #1D231F;
+
+  /* Terracotta (Warning, Danger & Badges) */
+  --color-natural-terracotta-50: #FEF6F4;
+  --color-natural-terracotta-100: #FCEAE5;
+  --color-natural-terracotta-600: #C27664; /* Clay reddish brown accent */
+  --color-natural-terracotta-700: #AA5F4E;
+  --color-natural-terracotta-800: #8C493B;
+  --color-natural-terracotta-950: #4B241C;
+
+  /* Clay Yellow / Ochre / Highlights */
+  --color-natural-clay-50: #FCF9EE;
+  --color-natural-clay-100: #F7EFCB;
+  --color-natural-clay-600: #C79A3F;   /* Subtle natural golden sand */
+}
+
+@utility animate-fadeIn {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+

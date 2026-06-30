@@ -1,0 +1,6 @@
+{
+  "name": "EcoRota+Impacto",
+  "description": "Plataforma Web de Logística Reversa, Descarte Consciente e Consulta Municipal de Pontos de Coleta e Impacto de Resíduos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

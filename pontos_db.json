@@ -1,0 +1,74 @@
+[
+  {
+    "id": 1,
+    "empresa": "Cargill S.A. - Distrito Industrial",
+    "endereco": "Av. Jorge Walter, 1500",
+    "cep": "84035-000",
+    "bairro": "Distrito Industrial",
+    "tipo": "Óleo",
+    "aprovado": 1
+  },
+  {
+    "id": 2,
+    "empresa": "Casas Bahia - Centro",
+    "endereco": "Avenida Vicente Machado, 525",
+    "cep": "84010-000",
+    "bairro": "Centro",
+    "tipo": "Lixo Eletrônico",
+    "aprovado": 1
+  },
+  {
+    "id": 3,
+    "empresa": "Droga Raia - Uvaranas",
+    "endereco": "Avenida Dom Geraldo Pellanda, 1200",
+    "cep": "84031-000",
+    "bairro": "Uvaranas",
+    "tipo": "Blisters",
+    "aprovado": 1
+  },
+  {
+    "id": 4,
+    "empresa": "Supermercado Condor - Oficinas",
+    "endereco": "Rua Dr. Paula Xavier, 1400",
+    "cep": "84040-000",
+    "bairro": "Oficinas",
+    "tipo": "Lâmpadas",
+    "aprovado": 1
+  },
+  {
+    "id": 5,
+    "empresa": "Supermercado Muffato - Olarias",
+    "endereco": "Rua Jacob Holzmann, 333",
+    "cep": "84060-000",
+    "bairro": "Olarias",
+    "tipo": "Pilhas",
+    "aprovado": 1
+  },
+  {
+    "id": 6,
+    "empresa": "Drogaria Poupa Lar - Jardim Carvalho",
+    "endereco": "Avenida Rocha Pombo, 450",
+    "cep": "84070-000",
+    "bairro": "Jardim Carvalho",
+    "tipo": "Blisters",
+    "aprovado": 1
+  },
+  {
+    "id": 7,
+    "empresa": "Reversa PG - Contorno",
+    "endereco": "Rua Nicolau Kluppel Neto, 100",
+    "cep": "84080-000",
+    "bairro": "Contorno",
+    "tipo": "Lixo Eletrônico",
+    "aprovado": 1
+  },
+  {
+    "id": 8,
+    "empresa": "Paróquia São Sebastião - Nova Rússia",
+    "endereco": "Praça Getúlio Vargas, 10",
+    "cep": "84030-000",
+    "bairro": "Nova Rússia",
+    "tipo": "Óleo",
+    "aprovado": 1
+  }
+]

@@ -1,0 +1,3 @@
+[2026-06-09 13:00:00] [SISTEMA] EcoRota+Impacto inicializado com sucesso para UTFPR Ponta Grossa.
+[2026-06-09 13:00:05] [SISTEMA] Banco de dados inicializado com dados ficcionais de Ponta Grossa.
+[2026-06-09 13:02:11] Calculou: Oleo=5L, Pilhas=10un, Blisters=0un, Lixo=0Kg, Lampadas=2un | CEP: 84031-000 Bairro: Uvaranas | Roteado para 2 locais.
