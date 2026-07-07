@@ -74,6 +74,21 @@ export default function App() {
   const [logs, setLogs] = useState<string[]>([]);
   const [loadingPanel, setLoadingPanel] = useState(false);
 
+  // --- PRODUTOS PARA TROCA (RECOMPENSAS) ---
+  const [produtosTroca, setProdutosTroca] = useState<any[]>([]);
+  const [produtosLoading, setProdutosLoading] = useState(false);
+  const [adminNewProduct, setAdminNewProduct] = useState({
+    name: "",
+    points: 10,
+    stock: 20,
+    description: "",
+    icon: "🛍️",
+    imageUrl: "",
+    redeemAddress: ""
+  });
+  const [adminProductSuccess, setAdminProductSuccess] = useState("");
+  const [adminProductError, setAdminProductError] = useState("");
+
   // Filtros painel adm
   const [adminFilter, setAdminFilter] = useState<"all" | "approved" | "pending">("all");
   const [logFilter, setLogFilter] = useState("");
@@ -498,11 +513,164 @@ export default function App() {
     }
   };
 
+  const fetchProdutosTroca = async () => {
+    setProdutosLoading(true);
+    try {
+      const res = await fetch("/api/produtos-troca");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.produtos)) {
+          setProdutosTroca(data.produtos);
+        }
+      }
+    } catch (e) {
+      console.error("Erro ao carregar produtos de troca:", e);
+    } finally {
+      setProdutosLoading(false);
+    }
+  };
+
+  const handleRedeemProduct = async (productId: string, productName: string, points: number) => {
+    if (!userToken) {
+      alert("Atenção: Você precisa estar logado para resgatar recompensas!");
+      return;
+    }
+    
+    setConfirmModal({
+      isOpen: true,
+      title: "Confirmar Resgate Ecológico",
+      message: `Deseja trocar ${points} EcoPontos pelo brinde "${productName}"? O item será retirado em nossa sede da Viver+Bio apresentando seu comprovante de resgate no seu Histórico.`,
+      confirmText: "Sim, Resgatar!",
+      isDanger: false,
+      onConfirm: async () => {
+        try {
+          const res = await fetch("/api/produtos-troca/resgatar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: userToken, productId })
+          });
+          const data = await res.json();
+          if (data.success) {
+            // Atualizar estados locais do usuário
+            setLoggedUser(data.user);
+            setUserSavedSimulations(data.user.savedSimulations || []);
+            setUserStats(data.user.stats);
+            setChallenges(data.user.challenges);
+            setProdutosTroca(data.produtos);
+            localStorage.setItem("eco_logged_user", JSON.stringify(data.user));
+            
+            // Ativar efeito visual de celebração!
+            setCelebrationDetails({
+              ponto: "Resgate de Recompensa",
+              residuo: productName,
+              qty: 1,
+              agua: 0,
+              co2: 0,
+              solo: 0
+            });
+            setShowCelebration(true);
+          } else {
+            alert(data.error || "Ocorreu um erro ao efetuar o resgate.");
+          }
+        } catch (err) {
+          console.error("Erro ao resgatar produto:", err);
+          alert("Ocorreu um erro ao se conectar com o servidor para resgate.");
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
+
+  const handleProductImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 3 * 1024 * 1024) { // Limite amigável de 3MB
+        setAdminProductError("A imagem selecionada é muito pesada! Escolha um arquivo de até 3MB.");
+        e.target.value = "";
+        return;
+      }
+      setAdminProductError("");
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAdminNewProduct(prev => ({ ...prev, imageUrl: reader.result as string }));
+      };
+      reader.onerror = () => {
+        setAdminProductError("Falha ao ler o arquivo de imagem.");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAdminAddProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminNewProduct.name.trim()) {
+      setAdminProductError("Informe o nome do produto.");
+      return;
+    }
+    setAdminProductError("");
+    setAdminProductSuccess("");
+    try {
+      const res = await fetch("/api/produtos-troca", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(adminNewProduct)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setProdutosTroca(data.produtos);
+        setAdminNewProduct({
+          name: "",
+          points: 10,
+          stock: 20,
+          description: "",
+          icon: "🛍️",
+          imageUrl: "",
+          redeemAddress: ""
+        });
+        setAdminProductSuccess("Recompensa cadastrada com sucesso!");
+        setTimeout(() => setAdminProductSuccess(""), 5000);
+      } else {
+        setAdminProductError(data.error || "Erro ao adicionar produto.");
+      }
+    } catch (err) {
+      console.error("Erro ao adicionar produto:", err);
+      setAdminProductError("Erro de conexão ao adicionar produto.");
+    }
+  };
+
+  const handleAdminDeleteProduct = async (id: string, name: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Excluir Recompensa",
+      message: `Tem certeza que deseja excluir permanentemente o produto "${name}" da lista de trocas?`,
+      confirmText: "Sim, Excluir",
+      isDanger: true,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/produtos-troca/${id}`, { method: "DELETE" });
+          const data = await res.json();
+          if (data.success) {
+            setProdutosTroca(data.produtos);
+          } else {
+            alert(data.error || "Erro ao excluir produto.");
+          }
+        } catch (err) {
+          console.error("Erro ao excluir produto:", err);
+          alert("Erro de conexão ao excluir produto.");
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
+
   // Efeitos iniciais
   useEffect(() => {
     // Sincronizar pontos de coleta de forma pública
     fetchPointsPublic();
     fetchDeliveriesPublic();
+    fetchProdutosTroca();
 
     // Carregar dados de perfil persistentes se autenticado
     const storedTokenUser = localStorage.getItem("eco_user_session_token");
@@ -2689,8 +2857,16 @@ export default function App() {
                     <p className="text-xs text-natural-stone">Soma consolidada de descartes e simulações gravadas em seu perfil.</p>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                     
+                    {/* Saldo de EcoPontos */}
+                    <div className="bg-emerald-50/40 p-4 rounded-xl border border-emerald-200 flex flex-col justify-between text-left shadow-2xs">
+                      <span className="text-[10px] text-emerald-800 uppercase font-mono font-bold flex items-center gap-1">🪙 EcoPontos</span>
+                      <strong className="text-xl font-serif text-emerald-950 mt-1">
+                        {userStats.feiraVerdeCredits || 0} pts
+                      </strong>
+                    </div>
+
                     {/* Agua acumulada */}
                     <div className="bg-natural-cream/30 p-4 rounded-xl border border-natural-border flex flex-col justify-between text-left">
                       <span className="text-[10px] text-natural-stone uppercase font-mono font-bold">Água Salva</span>
@@ -2732,6 +2908,123 @@ export default function App() {
                     </div>
 
                   </div>
+                </div>
+
+                {/* LOJA DE RECOMPENSAS (ECOTROCAS) */}
+                <div className="bg-natural-card p-6 rounded-2xl border border-natural-border shadow-sm space-y-6">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-natural-border pb-4">
+                    <div className="text-left">
+                      <h3 className="font-serif font-semibold text-natural-wood text-lg flex items-center gap-2">
+                        🛒 Loja de Recompensas Ecológicas (EcoTrocas)
+                      </h3>
+                      <p className="text-xs text-natural-stone">Troque os EcoPontos acumulados em suas entregas físicas por produtos sustentáveis.</p>
+                    </div>
+                    
+                    {/* Botão para ver a Política de Pontos */}
+                    <div className="bg-natural-sage-50 border border-natural-sage-100 p-3 rounded-xl text-left max-w-sm">
+                      <h5 className="text-[11px] font-bold text-natural-sage-950 uppercase font-mono tracking-wider flex items-center gap-1">📜 Política de EcoPontos</h5>
+                      <p className="text-[10px] text-natural-stone leading-relaxed mt-1">
+                        Ganhe <strong>EcoPontos</strong> ao registrar descarte físico de resíduos:
+                        <br />• 1L Óleo = <strong>2 pts</strong> | 10 Pilhas = <strong>3 pts</strong>
+                        <br />• 1Kg E-lixo = <strong>5 pts</strong> | 1 Lâmpada = <strong>1 pt</strong>
+                        <br />• 10 Blisters = <strong>2 pts</strong>
+                        <br /><span className="text-natural-terracotta-600 font-medium">Atenção: Simulações não pontuam. Somente descarte físico comprovado gera saldo!</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {produtosLoading ? (
+                    <div className="text-center py-6">
+                      <RefreshCw className="w-6 h-6 animate-spin text-natural-sage-600 mx-auto" />
+                      <p className="text-xs text-natural-stone mt-2 font-mono">Carregando catálogo de recompensas...</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                      {produtosTroca.length > 0 ? (
+                        produtosTroca.map((prod) => {
+                          const hasStock = prod.stock > 0;
+                          const hasPoints = (userStats.feiraVerdeCredits || 0) >= prod.points;
+                          const canRedeem = userToken && hasStock && hasPoints;
+                          
+                          return (
+                            <div 
+                              key={prod.id} 
+                              className={`bg-natural-cream/10 border p-4 rounded-xl flex flex-col justify-between transition-all hover:shadow-xs hover:border-natural-sage-300 relative text-left ${
+                                !hasStock ? "opacity-60 bg-natural-stone/5" : ""
+                              }`}
+                            >
+                              <div className="space-y-2.5">
+                                <div className="flex justify-between items-start">
+                                  <div className="bg-natural-sage-100/60 w-10 h-10 rounded-lg flex items-center justify-center text-xl border border-natural-sage-200 overflow-hidden">
+                                    {prod.imageUrl ? (
+                                      <img src={prod.imageUrl} alt={prod.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                    ) : (
+                                      prod.icon || "🎁"
+                                    )}
+                                  </div>
+                                  <span className="bg-emerald-50 text-emerald-800 text-[11px] font-mono font-bold px-2 py-0.5 rounded-full border border-emerald-100 shadow-3xs flex items-center gap-0.5">
+                                    🪙 {prod.points} pts
+                                  </span>
+                                </div>
+
+                                <div>
+                                  <h4 className="font-serif font-semibold text-natural-wood text-sm leading-tight">{prod.name}</h4>
+                                  <p className="text-[11px] text-natural-stone leading-relaxed mt-1">{prod.description}</p>
+                                  {prod.redeemAddress && (
+                                    <div className="text-[10px] text-natural-sage-900 bg-natural-sage-50/60 border border-natural-sage-100/50 p-2 rounded-lg mt-2 space-y-0.5">
+                                      <span className="font-bold block text-[9px] uppercase tracking-wider font-mono text-natural-sage-850">📍 Local de Resgate / Parceiro:</span>
+                                      <span className="text-natural-stone font-normal break-words block">{prod.redeemAddress}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="border-t border-natural-border/60 pt-3 mt-4 flex items-center justify-between gap-2">
+                                <span className={`text-[10px] font-mono font-medium ${hasStock ? "text-natural-sage-700" : "text-natural-terracotta-600 font-bold"}`}>
+                                  {hasStock ? `Estoque: ${prod.stock} un` : "ESGOTADO"}
+                                </span>
+
+                                {!userToken ? (
+                                  <button 
+                                    disabled
+                                    className="bg-natural-cream border border-natural-border text-natural-stone text-[10px] font-semibold py-1.5 px-3 rounded-lg cursor-not-allowed uppercase font-mono"
+                                  >
+                                    Login Necessário
+                                  </button>
+                                ) : !hasStock ? (
+                                  <button 
+                                    disabled
+                                    className="bg-natural-cream border border-natural-border text-natural-stone text-[10px] font-semibold py-1.5 px-3 rounded-lg cursor-not-allowed uppercase font-mono"
+                                  >
+                                    Sem Estoque
+                                  </button>
+                                ) : !hasPoints ? (
+                                  <button 
+                                    disabled
+                                    className="bg-natural-cream border border-natural-border text-natural-stone/50 text-[10px] font-semibold py-1.5 px-3 rounded-lg cursor-not-allowed uppercase font-mono"
+                                    title={`Você precisa de ${prod.points} pts, mas possui apenas ${userStats.feiraVerdeCredits || 0} pts.`}
+                                  >
+                                    Saldo Insuficiente
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleRedeemProduct(prod.id, prod.name, prod.points)}
+                                    className="bg-natural-sage-600 hover:bg-natural-sage-700 text-white text-[11px] font-bold py-1.5 px-3 rounded-lg shadow-3xs transition-colors cursor-pointer"
+                                  >
+                                    Resgatar Brinde
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="col-span-full text-center py-6 text-natural-stone font-mono text-xs">
+                          Nenhum produto cadastrado no catálogo de recompensas no momento.
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
 
@@ -3389,6 +3682,215 @@ export default function App() {
                         ) : (
                           <p className="text-natural-sand italic text-center py-12 text-xs">Nenhum alerta de funcionamento ativo no momento. Tudo operando perfeitamente!</p>
                         )}
+                      </div>
+                    </div>
+
+                    {/* GESTÃO DE PRODUTOS DE RECOMPENSA (ECOTROCAS) */}
+                    <div className="bg-natural-card p-6 rounded-2xl border border-natural-border shadow-sm space-y-6">
+                      <div className="flex justify-between items-center border-b border-natural-border pb-2">
+                        <div className="text-left">
+                          <h4 className="font-serif font-semibold text-natural-wood text-base">🎁 Gestão de Recompensas e Brindes</h4>
+                          <p className="text-xs text-natural-stone">Cadastre novos produtos ecológicos ou remova os existentes do catálogo de trocas.</p>
+                        </div>
+                        <span className="bg-natural-sage-50 text-natural-sage-800 text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full border border-natural-sage-100">
+                          {produtosTroca.length} Cadastrados
+                        </span>
+                      </div>
+
+                      {/* Formulário de Adicionar Produto */}
+                      <form onSubmit={handleAdminAddProduct} className="p-4 bg-natural-cream/10 border border-natural-border rounded-xl space-y-4 text-left">
+                        <h5 className="text-xs font-bold text-natural-wood uppercase font-mono tracking-wider">Novo Produto Sustentável</h5>
+                        
+                        {adminProductSuccess && (
+                          <div className="bg-natural-sage-50 border border-natural-sage-200 text-natural-sage-950 text-xs p-2.5 rounded-lg font-bold text-center">
+                            {adminProductSuccess}
+                          </div>
+                        )}
+                        {adminProductError && (
+                          <div className="bg-natural-terracotta-50 border border-natural-terracotta-200 text-natural-terracotta-800 text-xs p-2.5 rounded-lg font-bold text-center">
+                            {adminProductError}
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                          <div className="md:col-span-2 space-y-1">
+                            <label className="text-[10px] font-bold text-natural-stone uppercase block">Nome do Produto / Brinde</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="Ex: Sacola Ecológica de Algodão"
+                              value={adminNewProduct.name}
+                              onChange={e => setAdminNewProduct(prev => ({ ...prev, name: e.target.value }))}
+                              className="w-full px-3 py-1.5 rounded-lg border border-natural-border text-xs bg-white text-natural-wood focus:outline-none focus:ring-1 focus:ring-natural-sage-600"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-natural-stone uppercase block">EcoPontos Necessários</label>
+                            <input
+                              type="number"
+                              required
+                              min="1"
+                              value={adminNewProduct.points}
+                              onChange={e => setAdminNewProduct(prev => ({ ...prev, points: parseInt(e.target.value, 10) || 0 }))}
+                              className="w-full px-3 py-1.5 rounded-lg border border-natural-border text-xs bg-white text-natural-wood font-mono focus:outline-none focus:ring-1 focus:ring-natural-sage-600"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-natural-stone uppercase block">Estoque Inicial</label>
+                            <input
+                              type="number"
+                              required
+                              min="0"
+                              value={adminNewProduct.stock}
+                              onChange={e => setAdminNewProduct(prev => ({ ...prev, stock: parseInt(e.target.value, 10) || 0 }))}
+                              className="w-full px-3 py-1.5 rounded-lg border border-natural-border text-xs bg-white text-natural-wood font-mono focus:outline-none focus:ring-1 focus:ring-natural-sage-600"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-natural-stone uppercase block">Ícone / Emoji</label>
+                            <select
+                              value={adminNewProduct.icon}
+                              onChange={e => setAdminNewProduct(prev => ({ ...prev, icon: e.target.value }))}
+                              className="w-full px-3 py-1.5 rounded-lg border border-natural-border text-xs bg-white text-natural-wood focus:outline-none focus:ring-1 focus:ring-natural-sage-600"
+                            >
+                              <option value="🛍️">🛍️ Sacola / Bag</option>
+                              <option value="🥤">🥤 Caneca / Copo</option>
+                              <option value="🧼">🧼 Sabão / Higiene</option>
+                              <option value="🌱">🌱 Sementes / Planta</option>
+                              <option value="👕">👕 Camiseta / Vestuário</option>
+                              <option value="🎒">🎒 Mochila / Bolsa</option>
+                              <option value="📚">📚 Caderno / Livro</option>
+                              <option value="🖊️">🖊️ Caneta Eco</option>
+                              <option value="🎁">🎁 Brinde Geral</option>
+                            </select>
+                          </div>
+
+                          <div className="md:col-span-3 space-y-1">
+                            <label className="text-[10px] font-bold text-natural-stone uppercase block">Imagem do Produto (Opcional - substitui o Ícone)</label>
+                            {adminNewProduct.imageUrl ? (
+                              <div className="flex items-center gap-3 p-2 bg-white rounded-lg border border-natural-border">
+                                <img 
+                                  src={adminNewProduct.imageUrl} 
+                                  alt="Preview" 
+                                  className="w-10 h-10 object-cover rounded-md border border-natural-border"
+                                  referrerPolicy="no-referrer"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <span className="text-[10px] text-natural-sage-700 bg-natural-sage-50 border border-natural-sage-100 px-1.5 py-0.5 rounded font-bold uppercase font-mono">Carregada</span>
+                                  <p className="text-[10px] text-natural-stone truncate mt-0.5">Imagem pronta para salvar</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setAdminNewProduct(prev => ({ ...prev, imageUrl: "" }))}
+                                  className="text-xs text-natural-terracotta-600 hover:text-natural-terracotta-800 font-bold px-2 py-1 hover:bg-natural-terracotta-50 rounded transition-colors"
+                                >
+                                  Remover
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="relative flex items-center justify-center w-full">
+                                <label className="flex flex-col items-center justify-center w-full h-18 border-2 border-dashed border-natural-border hover:border-natural-sage-400 rounded-lg cursor-pointer bg-white transition-all hover:bg-natural-cream/10">
+                                  <div className="flex flex-col items-center justify-center pt-2 pb-2 text-center px-4">
+                                    <span className="text-xl">📁</span>
+                                    <p className="text-[11px] text-natural-stone mt-1">
+                                      <span className="font-semibold text-natural-sage-700">Clique para escolher arquivo</span>
+                                    </p>
+                                    <p className="text-[9px] text-natural-sand mt-0.5">PNG, JPG, JPEG ou GIF (máx. 3MB)</p>
+                                  </div>
+                                  <input 
+                                    type="file" 
+                                    accept="image/*" 
+                                    onChange={handleProductImageChange} 
+                                    className="hidden" 
+                                  />
+                                </label>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                          <div className="md:col-span-2 space-y-1">
+                            <label className="text-[10px] font-bold text-natural-stone uppercase block">Breve Descrição do Item</label>
+                            <input
+                              type="text"
+                              placeholder="Ex: Produto artesanal biodegradável de 500ml..."
+                              value={adminNewProduct.description}
+                              onChange={e => setAdminNewProduct(prev => ({ ...prev, description: e.target.value }))}
+                              className="w-full px-3 py-1.5 rounded-lg border border-natural-border text-xs bg-white text-natural-wood focus:outline-none focus:ring-1 focus:ring-natural-sage-600"
+                            />
+                          </div>
+
+                          <div className="md:col-span-2 space-y-1">
+                            <label className="text-[10px] font-bold text-natural-stone uppercase block">Endereço de Resgate / Parceiro (Opcional)</label>
+                            <input
+                              type="text"
+                              placeholder="Ex: Rua das Flores, 123 (Em branco para Sede Viver+Bio)"
+                              value={adminNewProduct.redeemAddress}
+                              onChange={e => setAdminNewProduct(prev => ({ ...prev, redeemAddress: e.target.value }))}
+                              className="w-full px-3 py-1.5 rounded-lg border border-natural-border text-xs bg-white text-natural-wood focus:outline-none focus:ring-1 focus:ring-natural-sage-600"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end pt-1">
+                          <button
+                            type="submit"
+                            className="inline-flex items-center gap-1.5 bg-natural-sage-600 hover:bg-natural-sage-700 text-white text-xs font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer border border-natural-sage-500/20 shadow-2xs"
+                          >
+                            <PlusCircle className="w-4 h-4" />
+                            Adicionar Recompensa
+                          </button>
+                        </div>
+                      </form>
+
+                      {/* Lista de Produtos Cadastrados */}
+                      <div className="space-y-3.5 text-left">
+                        <h5 className="text-xs font-bold text-natural-wood uppercase font-mono tracking-wider">Produtos Ativos para Resgate</h5>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {produtosTroca.length > 0 ? (
+                            produtosTroca.map((prod) => (
+                              <div key={prod.id} className="p-3.5 bg-natural-cream/20 border border-natural-border rounded-xl flex items-center justify-between gap-3 hover:bg-natural-cream/35 transition-colors">
+                                <div className="flex items-center gap-3">
+                                  <div className="bg-natural-sage-100 w-10 h-10 rounded-lg flex items-center justify-center text-lg border border-natural-sage-200 overflow-hidden shrink-0">
+                                    {prod.imageUrl ? (
+                                      <img src={prod.imageUrl} alt={prod.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                    ) : (
+                                      prod.icon || "🎁"
+                                    )}
+                                  </div>
+                                  <div>
+                                    <h6 className="font-serif font-bold text-natural-wood text-xs leading-tight">{prod.name}</h6>
+                                    <p className="text-[10px] text-natural-stone mt-0.5">
+                                      Custo: <span className="text-emerald-700 font-bold font-mono">{prod.points} EcoPontos</span> • Estoque: <span className="font-bold font-mono">{prod.stock} un</span>
+                                    </p>
+                                    {prod.redeemAddress && (
+                                      <p className="text-[9px] text-natural-sage-800 bg-natural-sage-50/70 border border-natural-sage-100/60 px-1.5 py-0.5 rounded mt-1 inline-block max-w-[180px] truncate" title={prod.redeemAddress}>
+                                        📍 {prod.redeemAddress}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <button
+                                  onClick={() => handleAdminDeleteProduct(prod.id, prod.name)}
+                                  className="text-natural-terracotta-500 hover:text-natural-terracotta-700 p-2 hover:bg-natural-terracotta-50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-natural-terracotta-100"
+                                  title="Remover Produto"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="col-span-full text-natural-sand italic text-center py-6 text-xs">Nenhum produto cadastrado para troca no momento. Cadastre acima!</p>
+                          )}
+                        </div>
                       </div>
                     </div>
 

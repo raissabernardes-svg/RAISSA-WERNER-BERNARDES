@@ -489,6 +489,18 @@ app.get("/api/exportar-csv", (req, res) => {
 
 // Caminho do banco de dados de usuários ecológicos registrados
 const USERS_DB_PATH = path.join(process.cwd(), "usuarios_db.json");
+const PRODUTOS_DB_PATH = path.join(process.cwd(), "produtos_db.json");
+
+interface ProdutoTroca {
+  id: string;
+  name: string;
+  points: number;
+  stock: number;
+  description: string;
+  icon: string;
+  imageUrl?: string;
+  redeemAddress?: string;
+}
 
 interface UserStats {
   aguaProtegida: number;
@@ -1290,6 +1302,192 @@ app.delete("/api/admin/sugestoes/:id", (req, res) => {
   saveSugestoesDB(filtradas);
   logConsulta(`[REGISTRO EXCLUÍDO] Sugestão ID ${id} foi arquivada permanentemente pelo Administrador.`);
   return res.json({ success: true });
+});
+
+// --- BANCO DE DADOS DE PRODUTOS DE TROCA ---
+function getProdutosDB(): ProdutoTroca[] {
+  let list: ProdutoTroca[] = [];
+  try {
+    if (fs.existsSync(PRODUTOS_DB_PATH)) {
+      const data = fs.readFileSync(PRODUTOS_DB_PATH, "utf-8");
+      list = JSON.parse(data);
+    } else {
+      list = [
+        {
+          id: "prod-1",
+          name: "Sacola Ecológica Reutilizável (EcoBag)",
+          points: 10,
+          stock: 50,
+          description: "Sacola resistente de algodão orgânico cru, ideal para compras e feiras.",
+          icon: "🛍️"
+        },
+        {
+          id: "prod-2",
+          name: "Caneca Ecológica de Fibra de Coco",
+          points: 15,
+          stock: 30,
+          description: "Caneca durável feita a partir de resíduos de coco e plástico biodegradável.",
+          icon: "🥤"
+        },
+        {
+          id: "prod-3",
+          name: "Sabão Caseiro Ecológico Artesanal",
+          points: 8,
+          stock: 25,
+          description: "Feito a partir de óleo vegetal reciclado purificado. Produto 100% biodegradável.",
+          icon: "🧼"
+        },
+        {
+          id: "prod-4",
+          name: "Kit de Sementes Hortaliças Orgânicas",
+          points: 5,
+          stock: 100,
+          description: "Inclui sementes de rúcula, alface e cenoura para montar sua mini-horta urbana.",
+          icon: "🌱"
+        },
+        {
+          id: "prod-5",
+          name: "Camiseta Algodão Orgânico Viver+Bio",
+          points: 40,
+          stock: 15,
+          description: "Camiseta exclusiva de algodão orgânico cru com estampa sustentável.",
+          icon: "👕"
+        }
+      ];
+      fs.writeFileSync(PRODUTOS_DB_PATH, JSON.stringify(list, null, 2), "utf-8");
+    }
+  } catch (err) {
+    console.error("Erro ao ler banco de dados de produtos:", err);
+    list = [];
+  }
+  return list;
+}
+
+function saveProdutosDB(list: ProdutoTroca[]) {
+  try {
+    fs.writeFileSync(PRODUTOS_DB_PATH, JSON.stringify(list, null, 2), "utf-8");
+  } catch (err) {
+    console.error("Erro ao salvar banco de dados de produtos:", err);
+  }
+}
+
+// API: Obter produtos de troca
+app.get("/api/produtos-troca", (req, res) => {
+  const produtos = getProdutosDB();
+  return res.json({ success: true, produtos });
+});
+
+// API: Adicionar novo produto de troca (Admin)
+app.post("/api/produtos-troca", (req, res) => {
+  const { name, points, stock, description, icon, imageUrl, redeemAddress } = req.body;
+  if (!name || points === undefined || stock === undefined) {
+    return res.status(400).json({ success: false, error: "Dados incompletos para cadastro do produto." });
+  }
+
+  const produtos = getProdutosDB();
+  const newProduct: ProdutoTroca = {
+    id: "prod-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
+    name: name.trim(),
+    points: parseInt(points, 10) || 0,
+    stock: parseInt(stock, 10) || 0,
+    description: (description || "").trim(),
+    icon: (icon || "🎁").trim(),
+    imageUrl: (imageUrl || "").trim(),
+    redeemAddress: (redeemAddress || "").trim()
+  };
+
+  produtos.push(newProduct);
+  saveProdutosDB(produtos);
+
+  logConsulta(`[PRODUTO ADICIONADO] Novo item de recompensa cadastrado: ${newProduct.name} por ${newProduct.points} pts.`);
+
+  return res.json({ success: true, product: newProduct, produtos });
+});
+
+// API: Excluir produto de troca (Admin)
+app.delete("/api/produtos-troca/:id", (req, res) => {
+  const { id } = req.params;
+  const produtos = getProdutosDB();
+  const filtrados = produtos.filter(p => p.id !== id);
+
+  if (produtos.length === filtrados.length) {
+    return res.status(404).json({ success: false, error: "Produto não encontrado." });
+  }
+
+  saveProdutosDB(filtrados);
+  logConsulta(`[PRODUTO EXCLUÍDO] Recompensa ID ${id} foi removida pelo Administrador.`);
+
+  return res.json({ success: true, produtos: filtrados });
+});
+
+// API: Resgatar produto de troca (Usuário Comum)
+app.post("/api/produtos-troca/resgatar", (req, res) => {
+  const { token, productId } = req.body;
+  if (!token || !token.startsWith("eco_usr_session_")) {
+    return res.status(401).json({ success: false, error: "Sessão inválida ou expirada." });
+  }
+
+  const parts = token.split("_");
+  const username = parts[3];
+  if (!username) {
+    return res.status(401).json({ success: false, error: "Token malformado." });
+  }
+
+  const usersDb = getUsersDB();
+  const user = usersDb[username];
+  if (!user) {
+    return res.status(404).json({ success: false, error: "Usuário não encontrado." });
+  }
+
+  const produtos = getProdutosDB();
+  const productIndex = produtos.findIndex(p => p.id === productId);
+  if (productIndex === -1) {
+    return res.status(404).json({ success: false, error: "Produto indisponível ou não encontrado." });
+  }
+
+  const product = produtos[productIndex];
+  if (product.stock <= 0) {
+    return res.status(400).json({ success: false, error: "Desculpe, este produto está temporariamente esgotado!" });
+  }
+
+  if (user.stats.feiraVerdeCredits < product.points) {
+    return res.status(400).json({ success: false, error: `Pontos insuficientes! Você precisa de ${product.points} EcoPontos, mas tem apenas ${user.stats.feiraVerdeCredits} pts.` });
+  }
+
+  // Deduzir estoque
+  product.stock -= 1;
+  produtos[productIndex] = product;
+  saveProdutosDB(produtos);
+
+  // Deduzir pontos do usuário e registrar a transação de resgate
+  user.stats.feiraVerdeCredits -= product.points;
+
+  const newRecord = {
+    id: "red-" + Date.now() + "-" + Math.floor(Math.random() * 1000000),
+    date: new Date().toLocaleDateString("pt-BR"),
+    bairro: "Troca Efetuada",
+    agua: 0,
+    co2: 0,
+    solo: 0,
+    materias: 0,
+    mercurio: 0,
+    feiraVerde: -product.points,
+    pontoConfirmado: `Resgate: ${product.name}`,
+    residuo: "Resgate de Brinde",
+    qty: 1,
+    tipoRegistro: "troca"
+  };
+
+  user.savedSimulations = user.savedSimulations || [];
+  user.savedSimulations.unshift(newRecord);
+
+  usersDb[username] = user;
+  saveUsersDB(usersDb);
+
+  logConsulta(`[RESGATE EFETUADO] O usuário @${username} resgatou [${product.name}] por ${product.points} EcoPontos.`);
+
+  const { passwordHash: _, ...publicUserData } = user;
+  return res.json({ success: true, user: publicUserData, produtos });
 });
 
 // Login do Administrador via Hash MD5 com admin123
